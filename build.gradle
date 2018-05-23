@@ -1,23 +1,47 @@
 buildscript {
-	ext {
-		springBootVersion = '2.0.0.RELEASE'
-	}
-	repositories {
-		mavenCentral()
-	}
-	dependencies {
-		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
-	}
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:2.0.0.RELEASE"
+        classpath "gradle.plugin.com.palantir.gradle.docker:gradle-docker:0.18.0"
+    }
 }
 
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'org.springframework.boot'
-apply plugin: 'io.spring.dependency-management'
+plugins {
+    id  'java'
+    id 'eclipse'
+    // id 'org.springframework.boot' version '2.0.2.RELEASE'
+    id 'com.palantir.docker' version '0.18.0'
+    id "com.github.hierynomus.license" version "0.14.0"
+    id "io.spring.dependency-management" version "1.0.4.RELEASE"
+
+}
+
+jar {
+    baseName = project.name.toLowerCase()
+    version = project.version
+}
+
+processResources {
+    filesMatching("**/*.properties") {
+        expand(project.properties)
+    }
+}
+
+ext { springBootVersion = '2.0.2.RELEASE' }
+
+
 
 group = 'com.matt'
-version = '0.0.1-SNAPSHOT'
+repositories {
+    mavenCentral()
+}
+
 sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 repositories {
 	mavenCentral()
@@ -25,18 +49,71 @@ repositories {
 	maven { url "https://repo.spring.io/milestone" }
 }
 
-
-ext {
-	springCloudVersion = 'Finchley.BUILD-SNAPSHOT'
-}
-
 dependencies {
-	compile('org.springframework.cloud:spring-cloud-starter-netflix-eureka-server')
-	testCompile('org.springframework.boot:spring-boot-starter-test')
+    compile "org.springframework.boot:spring-boot"
+	compile "org.springframework.cloud:spring-cloud-starter-netflix-eureka-server:1.4.4.RELEASE"
 }
 
-dependencyManagement {
-	imports {
-		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
-	}
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.0'
+}
+
+task initialiseParameters {
+
+    if(project.hasProperty('serviceVersion')){
+        println "Creating Jar with version "+ serviceVersion
+        jar.setProperty('version',serviceVersion)
+        project.version = serviceVersion
+    }else{
+        println "Using default version of " + ":" + jar['version']
+    }
+
+    build.dependsOn initialiseParameters
+
+}
+
+license {
+
+
+	header rootProject.file('LICENSE-COPYRIGHT.md')
+	excludes(["**/*.xml", "**/*.properties"])
+	//ignoreFailures = true;
+
+}
+
+downloadLicenses {
+	ext.apacheTwo = license('Apache License, Version 2.0', 'http://opensource.org/licenses/Apache-2.0')
+
+	aliases = [
+			(apacheTwo) : ['The Apache Software License, Version 2.0', 'Apache 2', 'Apache License Version 2.0', 'Apache License, Version 2.0', 'Apache License 2.0', license('Apache License', 'http://www.apache.org/licenses/LICENSE-2.0')]
+	]
+
+	includeProjectDependencies = true;
+	dependencyConfiguration = 'runtime';
+
+}
+
+docker {
+
+    String buildName = jar.getProperties()['baseName'].toString().toLowerCase()
+    String buildVersion = jar.getProperties()['version']
+
+    String imageName = "mjevans" + "/" +buildName
+    System.out.println("Creating image is " +imageName + " with tags 'latest' and "+buildVersion);
+    name imageName
+
+    String executablesToPackage = "build/libs/"+buildName+"-"+buildVersion + ".jar"
+    files executablesToPackage
+
+
+    dockerfile file('DockerFile')
+    buildArgs([
+            BUILD_NAME: buildName,
+            BUILD_VERSION:buildVersion,
+            PORT:project.port
+    ])
+
+    tags buildVersion
+    noCache true
+
 }
