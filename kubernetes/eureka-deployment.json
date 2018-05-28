@@ -27,7 +27,7 @@
           },
           "spec": {
               "containers":[ {
-                   "image":"mjevans/eurekaserver:0.1.3",
+                   "image":"mjevans/eurekaserverexample",
                    "imagePullPolicy": "Never",
                    "name": "eureka",
                    "ports":[ {
